@@ -22,8 +22,11 @@ const SUGGESTIONS = [
 ];
 
 /* ================= настройки ================= */
-const defaultApi = `http://${location.hostname || "localhost"}:8000/v1`;
-$("apiBase").value = localStorage.getItem("gg_api") || defaultApi;
+// по умолчанию — прокси /model на этом же хосте: работает и в локалке, и через порт-форвард
+const defaultApi = location.origin + "/model";
+let savedApi = localStorage.getItem("gg_api") || "";
+if (/:8000/.test(savedApi)) savedApi = "";  // миграция со старого прямого адреса
+$("apiBase").value = savedApi || defaultApi;
 $("apiBase").onchange = e => localStorage.setItem("gg_api", e.target.value.trim());
 for (const [id, key, def] of [["temp", "gg_temp", "0.8"], ["maxTok", "gg_maxtok", "250"], ["ctxMsgs", "gg_ctx", "6"]]) {
   $(id).value = localStorage.getItem(key) || def;

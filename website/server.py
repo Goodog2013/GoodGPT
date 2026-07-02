@@ -6,6 +6,7 @@
   - POST /api/register, /api/login, /api/logout, GET /api/me
   - GET/POST /api/chats, PATCH/DELETE /api/chats/<id>
   - GET/POST /api/chats/<id>/messages
+  - /model/* — прокси к API модели (localhost:8000), чтобы снаружи хватало ОДНОГО порта
 
 Запуск: python website/server.py [--host 0.0.0.0] [--port 8080]
 """
@@ -21,11 +22,14 @@ import sqlite3
 import argparse
 import threading
 import mimetypes
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "static")
 DB_PATH = os.path.join(BASE, "goodgpt_site.db")
+MODEL_API = "http://127.0.0.1:8000/v1"
 
 MAX_CHATS_PER_USER = 200
 MAX_MESSAGES_PER_CHAT = 500
@@ -123,6 +127,37 @@ class Handler(BaseHTTPRequestHandler):
             row = db.execute("SELECT 1 FROM chats WHERE id=? AND user_id=?", (chat_id, uid)).fetchone()
         return bool(row)
 
+    # ---------- прокси к модели ----------
+    def _proxy_model(self, method, subpath, body=None):
+        """Пробрасывает запрос к API модели, потоково отдавая ответ (SSE проходит насквозь)."""
+        req = urllib.request.Request(
+            MODEL_API + subpath, data=body, method=method,
+            headers={"Content-Type": "application/json"})
+        try:
+            resp = urllib.request.urlopen(req, timeout=600)
+        except urllib.error.HTTPError as e:
+            resp = e
+        except Exception as e:
+            self._err(502, "модель недоступна: " + str(e))
+            return
+        self.send_response(resp.status)
+        self.send_header("Content-Type", resp.headers.get("Content-Type", "application/json"))
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        try:
+            while True:
+                chunk = resp.read1(8192)  # read1 — отдаёт то, что уже пришло, не ждёт буфер
+                if not chunk:
+                    break
+                self.wfile.write(f"{len(chunk):X}\r\n".encode() + chunk + b"\r\n")
+                self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except (ConnectionAbortedError, BrokenPipeError):
+            pass  # клиент отключился
+
     # ---------- статика ----------
     def _serve_static(self, path):
         if path == "/":
@@ -161,6 +196,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path.startswith("/model/"):
+            self._proxy_model("GET", path[len("/model"):])
+            return
         if not path.startswith("/api/"):
             self._serve_static(path)
             return
@@ -205,6 +243,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path.startswith("/model/"):
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length) if 0 < length <= 1_000_000 else b"{}"
+            self._proxy_model("POST", path[len("/model"):], raw)
+            return
         body = self._body()
 
         if path == "/api/register":
