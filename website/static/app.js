@@ -395,7 +395,13 @@ ping(); setInterval(ping, 12000);
 
 /* ================= сайдбар ================= */
 $("collapseBtn").onclick = () => $("sidebar").classList.toggle("hidden");
-$("menuBtn").onclick = () => { $("sidebar").classList.add("open"); $("scrim").classList.add("on"); };
+$("menuBtn").onclick = () => {
+  if (innerWidth > 760) {
+    $("sidebar").classList.remove("hidden");   // десктоп: вернуть скрытую панель
+  } else {
+    $("sidebar").classList.add("open"); $("scrim").classList.add("on");
+  }
+};
 $("scrim").onclick = closeMobileSidebar;
 function closeMobileSidebar() { $("sidebar").classList.remove("open"); $("scrim").classList.remove("on"); }
 

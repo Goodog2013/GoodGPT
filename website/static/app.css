@@ -294,5 +294,7 @@ textarea {
   .suggest { display: none; }
 }
 @media (min-width: 761px) {
+  /* на десктопе гамбургер в шапке виден только когда панель скрыта */
   #menuBtn { display: none; }
+  #sidebar.hidden ~ #main #menuBtn { display: inline-block; }
 }
