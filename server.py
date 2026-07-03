@@ -249,9 +249,13 @@ def main():
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--ckpt", default="goodgpt_best.pt")
+    p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"],
+                   help="cpu — чтобы не отъедать VRAM у идущего обучения")
     args = p.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = args.device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     load_model(args.ckpt, device)
 
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
