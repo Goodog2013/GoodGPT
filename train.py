@@ -66,6 +66,10 @@ def main():
     p.add_argument("--dropout", type=float, default=0.05)
     p.add_argument("--resume", action="store_true")
     p.add_argument("--compile", action="store_true")
+    # --- режим SFT/дообучения ---
+    p.add_argument("--data_prefix", default="", help="напр. 'sft_' -> data/sft_train.bin")
+    p.add_argument("--init_ckpt", default="", help="чекпоинт для инициализации весов (без optimizer)")
+    p.add_argument("--ckpt_name", default="goodgpt", help="имя выходных чекпоинтов")
     args = p.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -74,8 +78,8 @@ def main():
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-    train_data = np.memmap(os.path.join(DATA_DIR, "train.bin"), dtype=np.uint16, mode="r")
-    val_data = np.memmap(os.path.join(DATA_DIR, "val.bin"), dtype=np.uint16, mode="r")
+    train_data = np.memmap(os.path.join(DATA_DIR, f"{args.data_prefix}train.bin"), dtype=np.uint16, mode="r")
+    val_data = np.memmap(os.path.join(DATA_DIR, f"{args.data_prefix}val.bin"), dtype=np.uint16, mode="r")
     print(f"train tokens: {len(train_data)/1e6:.1f}M, val tokens: {len(val_data)/1e6:.1f}M")
     data_splits = {"train": train_data, "val": val_data}
 
@@ -97,10 +101,16 @@ def main():
         weight_decay=args.weight_decay,
     )
 
-    ckpt_path = os.path.join(CKPT_DIR, "goodgpt.pt")
-    best_path = os.path.join(CKPT_DIR, "goodgpt_best.pt")
+    ckpt_path = os.path.join(CKPT_DIR, f"{args.ckpt_name}.pt")
+    best_path = os.path.join(CKPT_DIR, f"{args.ckpt_name}_best.pt")
     start_iter = 0
     best_val = float("inf")
+
+    if args.init_ckpt:
+        ck = torch.load(os.path.join(CKPT_DIR, args.init_ckpt), map_location=device)
+        model.load_state_dict(ck["model"])
+        print(f"веса инициализированы из {args.init_ckpt} (iter {ck.get('iter', '?')}, "
+              f"best_val {ck.get('best_val', float('nan')):.4f})")
 
     if args.resume and os.path.exists(ckpt_path):
         ck = torch.load(ckpt_path, map_location=device)
