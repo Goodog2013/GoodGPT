@@ -47,8 +47,9 @@ py -3.11 -m venv .venv
 стриминг ответов и блок «размышлений».
 
 ```powershell
-start_server.bat    # API модели (порт 8000)
+start_server.bat    # API модели (порт 8001, на CPU во время обучения)
 start_website.bat   # сайт (порт 8080) -> http://localhost:8080/
+stop_all.bat        # остановить сервер и сайт (обучение не трогает)
 ```
 
 В локальной сети: `http://192.168.1.3:8080/`. Код сайта — в `website/`

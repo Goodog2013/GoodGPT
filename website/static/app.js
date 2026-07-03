@@ -34,6 +34,36 @@ for (const [id, key, def] of [["temp", "gg_temp", "0.8"], ["maxTok", "gg_maxtok"
   $(id).oninput = e => { $(id + "Val").textContent = e.target.value; localStorage.setItem(key, e.target.value); };
 }
 $("gearBtn").onclick = () => $("settings").classList.toggle("open");
+$("settingsClose").onclick = () => $("settings").classList.remove("open");
+
+/* ================= свои диалоги вместо confirm/prompt ================= */
+let dlgResolve = null;
+function openDlg({ title, text = "", input = null, ok = "Ок", danger = false }) {
+  $("dlgTitle").textContent = title;
+  $("dlgText").textContent = text;
+  $("dlgText").style.display = text ? "" : "none";
+  const inp = $("dlgInput");
+  if (input !== null) { inp.style.display = ""; inp.value = input; }
+  else inp.style.display = "none";
+  const okBtn = $("dlgOk");
+  okBtn.textContent = ok;
+  okBtn.classList.toggle("danger", danger);
+  $("dlg").classList.add("open");
+  if (input !== null) setTimeout(() => { inp.focus(); inp.select(); }, 60);
+  return new Promise(res => { dlgResolve = res; });
+}
+function closeDlg(result) {
+  $("dlg").classList.remove("open");
+  if (dlgResolve) { dlgResolve(result); dlgResolve = null; }
+}
+$("dlgOk").onclick = () => closeDlg($("dlgInput").style.display === "none" ? true : $("dlgInput").value);
+$("dlgCancel").onclick = () => closeDlg(null);
+$("dlg").addEventListener("click", e => { if (e.target === $("dlg")) closeDlg(null); });
+$("dlgInput").addEventListener("keydown", e => { if (e.key === "Enter") $("dlgOk").click(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("dlg").classList.contains("open")) closeDlg(null); });
+
+const uiConfirm = (title, text, ok = "Удалить") => openDlg({ title, text, ok, danger: true });
+const uiPrompt = (title, value) => openDlg({ title, input: value, ok: "Сохранить" });
 
 /* ================= API-помощники ================= */
 async function api(method, path, body) {
@@ -187,10 +217,29 @@ function showHello() {
   $("messages").innerHTML = `
     <div class="hello">
       <div class="glyph">G</div>
-      <h2>Чем помочь?</h2>
+      <h2 id="helloTitle"></h2>
       <p>GoodGPT — модель на 109M параметров, обученная с нуля.<br>
       Болтает по-русски и умеет «думать», но факты может сочинять.</p>
     </div>`;
+  typeText($("helloTitle"), "Чем помочь?", 65);
+}
+
+/* печатающийся текст с кареткой (как заголовок на лендинге) */
+function typeText(el, text, speed) {
+  el.textContent = "";
+  const caret = document.createElement("span");
+  caret.className = "caret";
+  el.appendChild(caret);
+  let i = 0;
+  (function step() {
+    if (!el.isConnected) return;         // приветствие уже убрали — прекращаем
+    if (i < text.length) {
+      caret.insertAdjacentText("beforebegin", text[i++]);
+      setTimeout(step, speed + Math.random() * 35);
+    } else {
+      setTimeout(() => caret.remove(), 1800);
+    }
+  })();
 }
 
 /* ================= чаты ================= */
@@ -213,14 +262,14 @@ async function refreshChatList() {
     ren.className = "act"; ren.title = "Переименовать"; ren.innerHTML = "&#9998;";
     ren.onclick = async e => {
       e.stopPropagation();
-      const t = prompt("Название чата:", c.title);
+      const t = await uiPrompt("Название чата", c.title);
       if (t && t.trim()) { await store.renameChat(c.id, t.trim().slice(0, 80)); refreshChatList(); if (c.id === S.currentId) $("chatTitle").textContent = t.trim(); }
     };
     const del = document.createElement("button");
     del.className = "act del"; del.title = "Удалить"; del.innerHTML = "&#128465;";
     del.onclick = async e => {
       e.stopPropagation();
-      if (!confirm(`Удалить чат «${c.title}»?`)) return;
+      if (!await uiConfirm("Удалить чат?", `«${c.title}» исчезнет вместе с историей.`)) return;
       await store.deleteChat(c.id);
       if (c.id === S.currentId) newChat();
       refreshChatList();
@@ -340,6 +389,7 @@ async function send(textArg) {
           }
           if (d.content) {
             answer += d.content;
+            textEl.classList.add("streaming");
             textEl.innerHTML = renderMd(answer);
             scrollDown();
           }
@@ -356,6 +406,7 @@ async function send(textArg) {
     textEl.textContent = "Ошибка: " + e.message + ". Сервер модели запущен? (start_server.bat)";
     S.messages.pop();
   } finally {
+    textEl.classList.remove("streaming");
     S.busy = false; $("send").disabled = false; $("input").focus();
   }
 }
@@ -472,6 +523,45 @@ function renderUserBox() {
     box.appendChild(b);
   }
 }
+
+/* ================= фон: сеть как на лендинге ================= */
+(function net() {
+  const cv = $("net"), ctx = cv.getContext("2d");
+  let W, H, nodes = [];
+  function resize() {
+    W = cv.width = innerWidth; H = cv.height = innerHeight;
+    const n = Math.min(70, Math.floor(W * H / 30000));
+    nodes = Array.from({ length: n }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .3, vy: (Math.random() - .5) * .3,
+      r: 1 + Math.random() * 1.5,
+    }));
+  }
+  resize(); addEventListener("resize", resize);
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of nodes) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+    }
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+        if (d2 < 130 * 130) {
+          ctx.strokeStyle = `rgba(124, 92, 255, ${(1 - Math.sqrt(d2) / 130) * .25})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = "rgba(150, 130, 255, .7)";
+      ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 7); ctx.fill();
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
 
 /* ================= запуск ================= */
 (async function init() {

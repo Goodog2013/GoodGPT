@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+<canvas id="net"></canvas>
 <div class="orb orb1"></div><div class="orb orb2"></div>
 
 <div id="layout">
@@ -40,13 +41,6 @@
       <button class="iconbtn" id="gearBtn" title="Настройки">&#9881;</button>
     </header>
 
-    <div id="settings">
-      <label>API модели <input type="text" id="apiBase"></label>
-      <label>Температура <input type="range" id="temp" min="0.1" max="1.5" step="0.05" value="0.8"><span class="val" id="tempVal">0.8</span></label>
-      <label>Макс. токенов <input type="range" id="maxTok" min="20" max="600" step="10" value="250"><span class="val" id="maxTokVal">250</span></label>
-      <label>Реплик в контексте <input type="range" id="ctxMsgs" min="2" max="12" step="2" value="6"><span class="val" id="ctxMsgsVal">6</span></label>
-    </div>
-
     <div id="chat"><div class="wrap" id="messages"></div></div>
 
     <footer>
@@ -58,6 +52,52 @@
       <div class="hint">Enter — отправить · Shift+Enter — новая строка · модель может ошибаться и фантазировать</div>
     </footer>
   </main>
+
+  <!-- ===== панель настроек (справа) ===== -->
+  <aside id="settings">
+    <div class="set-head">
+      <div class="set-title">Настройки</div>
+      <button class="iconbtn" id="settingsClose">&#10005;</button>
+    </div>
+    <div class="set-body">
+      <div class="set-group">
+        <div class="set-label">Температура <span class="val" id="tempVal">0.8</span></div>
+        <input type="range" id="temp" min="0.1" max="1.5" step="0.05" value="0.8">
+        <div class="set-hint">Ниже — предсказуемее, выше — креативнее</div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Макс. токенов <span class="val" id="maxTokVal">250</span></div>
+        <input type="range" id="maxTok" min="20" max="600" step="10" value="250">
+        <div class="set-hint">Длина ответа модели</div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Реплик в контексте <span class="val" id="ctxMsgsVal">6</span></div>
+        <input type="range" id="ctxMsgs" min="2" max="12" step="2" value="6">
+        <div class="set-hint">Сколько последних сообщений видит модель</div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">API модели</div>
+        <input type="text" id="apiBase">
+        <div class="set-hint">Обычно менять не нужно — прокси на этом же хосте</div>
+      </div>
+      <div class="set-about">
+        GoodGPT-01 · 109M параметров<br>обучена с нуля на RTX 3060
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ===== диалог (подтверждение / ввод) ===== -->
+<div class="modal-back" id="dlg">
+  <div class="modal dlg">
+    <h3 id="dlgTitle"></h3>
+    <p class="modal-sub" id="dlgText"></p>
+    <input type="text" id="dlgInput" style="display:none">
+    <div class="dlg-row">
+      <button class="btn ghost half" id="dlgCancel">Отмена</button>
+      <button class="btn half" id="dlgOk">Ок</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== модалка входа ===== -->
