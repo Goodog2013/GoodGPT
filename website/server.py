@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "static")
 DB_PATH = os.path.join(BASE, "goodgpt_site.db")
-MODEL_API = "http://127.0.0.1:8000/v1"
+MODEL_API = "http://127.0.0.1:8001/v1"
 
 MAX_CHATS_PER_USER = 200
 MAX_MESSAGES_PER_CHAT = 500
